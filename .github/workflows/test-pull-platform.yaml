@@ -1,0 +1,137 @@
+name: Test Pull Platform
+on: 
+  push:
+  workflow_dispatch:
+
+env:
+  TEST_PLUGIN_IMG: 'quay.io/tkral/backstage-community-plugin-todo'
+  TEST_PLUGIN_NS: '@solo.io'
+  TEST_PLUGIN_NAME: 'platform-portal-backstage-plugin-backend'
+  TEST_PLUGIN_REPO: 'solo-io/platform-portal-backstage-plugin-backend'
+  TEST_PLUGIN_REPO_REF: '90463fe991ab23ce59b1573f3417e9532292f753'
+  TEST_PLUGIN_LOCAL_DIR:  pluginsrc
+  TEST_PLUGIN_TYPE: backend-plugin
+
+jobs:
+  test-pull-platform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to github registry
+        uses: actions-hub/docker/login@master
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_REGISTRY_URL: quay.io
+      - name: Pull plugin repo from quay
+        uses: actions-hub/docker@master
+        with:
+          args: create --name=plugin-tmp ${{ env.TEST_PLUGIN_IMG }}:v0.1.1 /bin/sh
+      - name: Copy files form image
+        uses: actions-hub/docker@master
+        with:
+          args: cp plugin-tmp:/ .
+
+      # - name: Pull plugin repo from quay
+      #   uses: actions-hub/docker@master
+      #   with:
+      #     args: run ${{ env.TEST_PLUGIN_IMG }}:v0.1.1 
+      - name: get files
+        run: ls
+      - name: test
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: get pods
+      - name: install os deps
+        run: |
+          sudo apt install g++ -y 
+          curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+          sudo apt-get install apt-transport-https --yes
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+          sudo apt-get update
+          sudo apt-get install helm
+
+
+
+      - name: setup config and run helm list
+        run: mkdir /opt/.kube; echo "$KUBESECRET" | base64  -d > /opt/.kube/config; helm --kubeconfig /opt/.kube/config list
+        env:
+          KUBESECRET: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Clone GuillaumeFalourd/poc-github-actions PUBLIC repository
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          depth: 1
+          branch: 'main'
+          owner: 'dcurran90'
+          repository: 'dh-plugin-workflow-hackery'
+
+      - name: run helm install
+        run: helm repo add openshift-helm-charts https://charts.openshift.io/; helm --kubeconfig /opt/.kube/config install redhat-developer-hub-actions -f dh-plugin-workflow-hackery/rhdh-helm-values.yaml openshift-helm-charts/redhat-developer-hub
+        
+
+      # - name: 'Deploy'
+      #   uses: 'deliverybot/helm@v1'
+      #   with:
+      #     release: 'RHDH'
+      #     # namespace: 'default'
+      #     chart: 'openshift-helm-charts/redhat-developer-hub'
+      #     token: '${{ github.token }}'
+      #     values: |
+      #       name: foobar
+      #     value-files: >-
+      #       [
+      #         "rdhd-helm-values.yaml", 
+      #         "values.production.yaml"
+      #       ]
+      #   env:
+      #     KUBECONFIG_FILE: '/opt/.kube/config'
+
+
+
+      # - name: pull relevant platform
+      #   id: pull-platform
+      #   uses: komish/dh-plugin-workflow-hackery/.github/actions/pull-platform@main
+      #   with:
+      #     token: ${{ github.token }}
+      # - name: setup node
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version-file: 'platform/.nvmrc'
+      # - name: install platform deps
+      #   working-directory: ${{ steps.pull-platform.outputs.platform-content-dir }}
+      #   run: |
+      #     yarn install \
+      #       --frozen-lockfile
+      # - name: pull plugin repo
+      #   uses: actions/checkout@v4
+      #   with:
+      #     repository: ${{ env.TEST_PLUGIN_REPO }}
+      #     ref: ${{ env.TEST_PLUGIN_REPO_REF }}
+      #     path: ${{ env.TEST_PLUGIN_LOCAL_DIR }}
+      # - name: copy plugin content to platform
+      #   run: |
+      #     cp -Rav ${{ env.TEST_PLUGIN_LOCAL_DIR }}/plugins/${{ env.TEST_PLUGIN_NAME }} ${{ steps.pull-platform.outputs.platform-content-dir }}/plugins/
+      # - name: Test plugin dep install
+      #   working-directory: ${{ steps.pull-platform.outputs.platform-content-dir }}
+      #   run: |
+      #     yarn workspace ${{ env.TEST_PLUGIN_NS }}/${{ env.TEST_PLUGIN_NAME }} \
+      #       install \
+      #       --frozen-lockfile \
+      #       --production
+      # - name: export dynamic plugin
+      #   working-directory: ${{ steps.pull-platform.outputs.platform-content-dir }}/plugins/${{ env.TEST_PLUGIN_NAME }}
+      #   run: |
+      #     npx janus-cli package export-dynamic-plugin
+      # - name: publish dynamic plugin
+      #   working-directory: ${{ steps.pull-platform.outputs.platform-content-dir }}/plugins/${{ env.TEST_PLUGIN_NAME }}/dist-dynamic
+      #   run: |
+      #     echo '@dcurran90:registry=https://npm.pkg.github.com' > .npmrc
+      #     npm publish
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+
+
+
