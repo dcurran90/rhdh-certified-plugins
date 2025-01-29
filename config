@@ -21,4 +21,4 @@ preferences: {}
 users:
 - name: kube:admin/api-dancurran-lab2025-opdev-io:6443
   user:
-    token: sha256~xNBP5bgwSue-tvZsCEchiEwhCkSgBWgPFp3I649EJWU
+    token: sha256~mIHFSTP0vLmfiQbw2-isfckdTcCCx-xIS-cvymE4jMw

@@ -3,4 +3,5 @@ certified:
     authors: 
     owners: 
     image_loc: 
-    version: 
+    plugin_version: 
+    rhdh_version: 
